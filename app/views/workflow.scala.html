@@ -1,0 +1,91 @@
+@(
+    versionTags: Seq[model.VersionTag.Tag],
+    locales: Seq[model.CopyLocale],
+    currentTag: model.VersionTag.Tag,
+    currentLocale: model.CopyLocale,
+    primaryBundle: Map[String, model.CopyRecord],
+    bundle: Map[String, model.CopyRecord],
+    user: String
+)
+
+@selectedClass(on: Boolean) = {
+    @{if(on) "selected" else "unselected"}
+}
+
+@rowClasses(record: model.CopyRecord, primary: model.CopyRecord) = {
+    @{if (record.inherited) "inherited" else ""}
+}
+
+@main("Copy Manager") {
+    <script>
+        var currentTag = '@currentTag.id';
+        var currentLocale = '@currentLocale.id';
+        var editable = @currentTag.allowsEdits;
+    </script>
+
+    <h1>
+        <div id="login">User @user | <a href="/password">Change password</a> | <a href="/login">Log out</a></div>
+        Copy Manager
+    </h1>
+
+    <ul class="versionTags">
+        @for(tag <- versionTags.reverse) {
+            <li class="@selectedClass(tag == currentTag)" data-dest="@tag.id">@tag.name</li>
+        }
+    </ul>
+
+    <ul class="locales">
+        @for(locale <- locales.sortBy(l => (!l.isPrimary, l.name))) {
+            <li class="@selectedClass(locale == currentLocale)" data-dest="@locale.id">@locale.name</li>
+        }
+    </ul>
+
+    <ul class="keys">
+        @for((key, record) <- bundle.toSeq.sortBy(_._1)) {
+            @defining(primaryBundle(key)) { primary =>
+                <li class="record" data-key="@key" data-version="@record.version">
+                    <div class="rowHeader">
+                        <h3>@key</h3>
+                        <div class="metadata">
+                            [@record.version]
+                            @record.update.user;
+                            @record.update.friendlyTime
+                            @if(record.inherited) { (inherited from '@currentLocale.parent') }
+                            @for(approval <- record.approvals) { <span class="approval">@approval.user</span> }
+                            @for(rejection <- record.rejections) { <span class="rejection">@rejection.user</span> }
+                            @if(record.inherited) {
+                                <span class="translate">Requires translation</span>
+                            } else { @if(primary.retranslate && !currentLocale.isPrimary && record.version <= primary.version) {
+                                <span class="retranslate">Requires retranslation</span>
+                            }}
+                        </div>
+                    </div>
+                    <div class="rowBody">
+                        @if(!currentLocale.isPrimary) { <div class="original">@primary.text</div> }
+                        <div class="nonedit @rowClasses(record, primary)">
+                            <button class="editButton">Edit</button>
+                            @if(!record.inherited) {
+                                <button class="approveButton">Approve</button>
+                                <button class="rejectButton">Reject</button>
+                            }
+                            <div class="translated">@record.text</div>
+                        </div>
+                        <div class="edit">
+                            <button class="saveButton">Save</button>
+                            <input class="editText" value="@record.text"/>
+                        </div>
+                    </div>
+                </li>
+            }
+        }
+        @if(currentLocale.isPrimary && currentTag.allowsEdits) {
+            <li class="new">
+                <div class="rowBody">
+                    <h3><input id="newKey" placeholder="New copy key"/></h3>
+                    <input id="newText" placeholder="Initial content"/>
+                    <button id="newSubmit">Add</button>
+                </div>
+            </li>
+        }
+    </ul>
+}
